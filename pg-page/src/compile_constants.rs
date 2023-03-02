@@ -1,0 +1,3 @@
+pub const TOAST_TUPLE_TARGET: u32 = 2048;
+pub const TOAST_TUPLE_THRESHOLD: u32 = 2048;
+pub const TOAST_MAX_CHUNK_SIZE: u32 = 2048;
