@@ -1,4 +1,4 @@
-use crate::fs_format::{ByteEncodeResult, ByteEncoded};
+use crate::util::{ByteEncodeResult, ByteEncoded};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct PageXLogRecPtr {

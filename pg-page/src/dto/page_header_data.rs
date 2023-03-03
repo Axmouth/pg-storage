@@ -1,4 +1,4 @@
-use crate::fs_format::{ByteEncodeResult, ByteEncoded};
+use crate::util::{ByteEncodeResult, ByteEncoded};
 
 use super::page_xl_log_rex_ptr::PageXLogRecPtr;
 

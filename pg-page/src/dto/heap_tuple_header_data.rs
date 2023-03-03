@@ -1,4 +1,4 @@
-use crate::fs_format::{ByteEncodeResult, ByteEncoded, GetByteSliceExt};
+use crate::util::{ByteEncodeResult, ByteEncoded, GetByteSliceExt};
 
 use super::item_pointer_data::ItemPointerData;
 
@@ -167,6 +167,12 @@ impl ByteEncoded for HeapTupleHeaderData {
             t_hoff,
             data,
         })
+    }
+}
+
+impl HeapTupleHeaderData {
+    pub fn visible_to_tx(&self, xid: u32) -> bool {
+        todo!()
     }
 }
 

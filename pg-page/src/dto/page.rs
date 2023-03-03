@@ -1,4 +1,4 @@
-use crate::fs_format::{ByteEncodeResult, ByteEncoded, GetByteSliceExt};
+use crate::util::{ByteEncodeResult, ByteEncoded, GetByteSliceExt};
 
 use super::{
     *

@@ -1,5 +1,5 @@
 use c2rust_bitfields::BitfieldStruct;
-use crate::fs_format::{ByteEncodeResult, ByteEncoded};
+use crate::util::{ByteEncodeResult, ByteEncoded};
 
 ///
 /// A line pointer on a buffer page.  See buffer page definitions and comments

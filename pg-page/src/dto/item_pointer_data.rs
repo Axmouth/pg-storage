@@ -1,4 +1,4 @@
-use crate::fs_format::{ByteEncodeResult, ByteEncoded};
+use crate::util::{ByteEncodeResult, ByteEncoded};
 
 use super::block_id_data::BlockIdData;
 

@@ -22,6 +22,7 @@ pub type ByteEncodeResult<T> = Result<T, ByteEncodeError>;
 
 pub trait GetByteSliceExt {
     fn get_byte_slice(&self, start: usize, end: usize) -> ByteEncodeResult<&[u8]>;
+    fn get_byte_slice_mut(&mut self, start: usize, end: usize) -> ByteEncodeResult<&mut [u8]>;
 }
 
 impl GetByteSliceExt for [u8] {
@@ -29,6 +30,14 @@ impl GetByteSliceExt for [u8] {
         self.get(start..end).ok_or(ByteEncodeError::NotEnoughBytes {
             expected: end,
             actual: self.len(),
+        })
+    }
+    
+    fn get_byte_slice_mut(&mut self, start: usize, end: usize) -> ByteEncodeResult<&mut [u8]> {
+        let actual = self.len();
+        self.get_mut(start..end).ok_or(ByteEncodeError::NotEnoughBytes {
+            expected: end,
+            actual,
         })
     }
 }
@@ -342,7 +351,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::*;
+    use crate::dto::*;
 
     #[test]
     fn test_item() {
