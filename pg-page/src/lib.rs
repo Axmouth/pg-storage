@@ -8,6 +8,8 @@ pub mod dto;
 pub enum Error {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+    #[error("Error with byte decoding: {0}")]
+    ByteEncoding(#[from] util::ByteEncodeError),
     #[error("Invalid byte encoding: {0}")]
     InvalidByteEncoding(String),
     #[error("Invalid page size: {0}")]

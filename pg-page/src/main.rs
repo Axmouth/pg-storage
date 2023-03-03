@@ -3,8 +3,7 @@ use std::{fs::File, io::BufReader};
 use pg_page::{dto::PageLazy, util::ByteEncodeError};
 
 fn main() {
-    let mut table_file =
-        File::open(r#"C:\Program Files\PostgreSQL\14\data\base\16616\238525"#).unwrap();
+    let mut table_file = std::env::args().nth(1).map(File::open).unwrap().unwrap();
     let mut reader = BufReader::new(&mut table_file);
 
     let mut pages = Vec::new();
@@ -28,7 +27,8 @@ fn main() {
     for page in pages {
         eprintln!("Page data len: {:#?}", page.data.len());
 
-        for (_, item) in page.iter_tuples() {
+        for res in page.iter_tuples() {
+            let (_, item) = res.unwrap();
             println!("{:#?}", String::from_utf8_lossy(&item.data));
         }
     }

@@ -1,4 +1,4 @@
-use crate::util::{ByteEncodeResult, ByteEncoded, GetByteSliceExt};
+use crate::{util::{ByteEncodeResult, ByteEncoded, GetByteSliceExt}, Error};
 
 use super::{
     *
@@ -81,19 +81,32 @@ pub struct PageLazyTuplesIter<'a> {
 }
 
 impl Iterator for PageLazyTuplesIter<'_> {
-    type Item = (ItemIdData, HeapTupleHeaderData);
+    type Item = Result<(ItemIdData, HeapTupleHeaderData), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.cursor >= (self.page.header_data.pd_lower - PageHeaderData::byte_size()) {
             None
         } else {
-            let item_id = self.page.data.get_byte_slice(self.cursor as usize, (self.cursor + ItemIdData::byte_size()) as usize).unwrap();
-            let item_id = ItemIdData::decode(item_id).ok()?;
+            // TODO: Handle errors(return Result?)
+            let item_id = match self.page.data.get_byte_slice(self.cursor as usize, (self.cursor + ItemIdData::byte_size()) as usize) {
+                Ok(item_id) => item_id,
+                Err(err) => return Some(Err(err.into())),
+            };
+            let item_id = match ItemIdData::decode(item_id) {
+                Ok(item_id) => item_id,
+                Err(err) => return Some(Err(err.into())),
+            };
             let real_offset = item_id.lp_off() - PageHeaderData::byte_size();
-            let item = self.page.data.get_byte_slice(real_offset as usize, (real_offset + item_id.lp_len()) as usize).unwrap();
-            let item = HeapTupleHeaderData::decode(item).ok()?;
+            let item = match self.page.data.get_byte_slice(real_offset as usize, (real_offset + item_id.lp_len()) as usize) {
+                Ok(item) => item,
+                Err(err) => return Some(Err(err.into())),
+            };
+            let item = match HeapTupleHeaderData::decode(item) {
+                Ok(item) => item,
+                Err(err) => return Some(Err(err.into())),
+            };
             self.cursor += ItemIdData::byte_size();
-            Some((item_id, item))
+            Some(Ok((item_id, item)))
         }
     }
 }
