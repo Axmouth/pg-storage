@@ -35,4 +35,8 @@ impl ByteEncoded for ItemPointerData {
         let ip_posid = u16::decode_from_reader(reader)?;
         Ok(ItemPointerData { ip_blkid, ip_posid })
     }
+
+    fn byte_size() -> u16 {
+        6
+    }
 }

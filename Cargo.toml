@@ -1,5 +1,6 @@
 [workspace]
 
 members = [
-    "pg-page"
+    "pg-page",
+    "storage-buffer"
 ]

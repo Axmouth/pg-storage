@@ -11,22 +11,6 @@ pub struct PageLazy {
 }
 
 impl PageLazy {
-    pub fn from_reader(reader: &mut impl std::io::Read) -> ByteEncodeResult<Self> {
-        let header_size = PageHeaderData::byte_size() as usize;
-        let mut bytes = vec![0; header_size];
-        reader.read_exact(&mut bytes)?;
-        let header_data = PageHeaderData::decode(&bytes)?;
-        let page_size = header_data.page_size();
-        
-        let mut data = vec![0; page_size - header_size];
-        reader.read_exact(&mut data)?;
-
-        Ok(PageLazy {
-            header_data,
-            data,
-        })
-    }
-
     pub fn iter_tuples(&self) -> PageLazyTuplesIter {
         PageLazyTuplesIter {
             page: self,
@@ -87,21 +71,27 @@ impl Iterator for PageLazyTuplesIter<'_> {
         if self.cursor >= (self.page.header_data.pd_lower - PageHeaderData::byte_size()) {
             None
         } else {
-            // TODO: Handle errors(return Result?)
-            let item_id = match self.page.data.get_byte_slice(self.cursor as usize, (self.cursor + ItemIdData::byte_size()) as usize) {
+            let item_id_bytes = match self.page.data.get_byte_slice(self.cursor as usize, (self.cursor + ItemIdData::byte_size()) as usize) {
                 Ok(item_id) => item_id,
                 Err(err) => return Some(Err(err.into())),
             };
-            let item_id = match ItemIdData::decode(item_id) {
+            let item_id = match ItemIdData::decode(item_id_bytes) {
                 Ok(item_id) => item_id,
                 Err(err) => return Some(Err(err.into())),
             };
+
+            // TODO: Handle redirect and dead items
+            if !item_id.is_normal() {
+                self.cursor += ItemIdData::byte_size();
+                // TODO: Avoid recursion
+                return self.next();
+            }
             let real_offset = item_id.lp_off() - PageHeaderData::byte_size();
-            let item = match self.page.data.get_byte_slice(real_offset as usize, (real_offset + item_id.lp_len()) as usize) {
+            let item_bytes = match self.page.data.get_byte_slice(real_offset as usize, (real_offset + item_id.lp_len()) as usize) {
                 Ok(item) => item,
                 Err(err) => return Some(Err(err.into())),
             };
-            let item = match HeapTupleHeaderData::decode(item) {
+            let item = match HeapTupleHeaderData::decode(item_bytes) {
                 Ok(item) => item,
                 Err(err) => return Some(Err(err.into())),
             };

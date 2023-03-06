@@ -18,6 +18,22 @@ pub enum ByteEncodeError {
     FromUtf8Error(#[from] std::string::FromUtf8Error),
 }
 
+pub fn read_exact_with_eof(
+    bytes: &mut [u8],
+    reader: &mut impl std::io::Read,
+) -> ByteEncodeResult<Option<()>> {
+    match reader.read_exact(bytes) {
+        Ok(_) => Ok(Some(())),
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                Ok(None)
+            } else {
+                Err(e.into())
+            }
+        }
+    }
+}
+
 pub type ByteEncodeResult<T> = Result<T, ByteEncodeError>;
 
 pub trait GetByteSliceExt {
@@ -32,13 +48,14 @@ impl GetByteSliceExt for [u8] {
             actual: self.len(),
         })
     }
-    
+
     fn get_byte_slice_mut(&mut self, start: usize, end: usize) -> ByteEncodeResult<&mut [u8]> {
         let actual = self.len();
-        self.get_mut(start..end).ok_or(ByteEncodeError::NotEnoughBytes {
-            expected: end,
-            actual,
-        })
+        self.get_mut(start..end)
+            .ok_or(ByteEncodeError::NotEnoughBytes {
+                expected: end,
+                actual,
+            })
     }
 }
 

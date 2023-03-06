@@ -27,6 +27,7 @@ pub struct ItemIdData {
 ///      Redirect
 /// In a REDIRECT pointer, lp_off holds offset number for next line pointer
 ///
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum LpFlags {
     /// unused (should always have lp_len=0)
     Unused = 0,
@@ -78,5 +79,21 @@ impl ItemIdData {
             2 => LpFlags::Redirect,
             _ => LpFlags::Dead,
         }
+    }
+
+    pub fn is_dead(&self) -> bool {
+        self.flags() == LpFlags::Dead
+    }
+
+    pub fn is_normal(&self) -> bool {
+        self.flags() == LpFlags::Normal
+    }
+
+    pub fn is_redirect(&self) -> bool {
+        self.flags() == LpFlags::Redirect
+    }
+
+    pub fn is_unused(&self) -> bool {
+        self.flags() == LpFlags::Unused
     }
 }

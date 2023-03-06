@@ -3,6 +3,7 @@ use thiserror::Error;
 pub mod compile_constants;
 pub mod util;
 pub mod dto;
+pub mod page_reader;
 
 #[derive(Debug, Error)]
 pub enum Error {

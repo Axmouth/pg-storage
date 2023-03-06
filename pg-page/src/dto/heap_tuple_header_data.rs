@@ -1,6 +1,26 @@
-use crate::util::{ByteEncodeResult, ByteEncoded, GetByteSliceExt};
+use crate::util::{ByteEncodeResult, ByteEncoded, GetByteSliceExt, ByteEncodeError};
 
 use super::item_pointer_data::ItemPointerData;
+
+pub struct MinimalTupleData {
+    /// actual length of minimal tuple
+    pub t_len: u32,
+
+    /// Fields below here must match HeapTupleHeaderData!
+    pub mt_padding: Vec<u8>,
+
+    /// number of attributes + various flags
+    pub t_infomask2: u16,
+    /// various flag bits, see below
+    pub t_infomask: u16,
+    /// sizeof header incl. bitmap, padding
+
+    /// ^ - 23 bytes - ^
+    pub t_hoff: u8,
+    /// bitmap of NULLs
+    pub t_bits: Vec<u8>,
+    // MORE DATA FOLLOWS AT END OF STRUCT
+}
 
 ///
 /// Heap tuple header.  To avoid wasting space, the fields should be
@@ -79,11 +99,10 @@ pub struct HeapTupleHeaderData {
     pub t_xmin: u32,
     /// delete XID stamp
     pub t_xmax: u32,
-    /// insert and/or delete CID stamp (overlays with t_xvac)
-    pub t_cid: u32,
-    /// XID for VACUUM operation moving a row version
-    pub t_xvac: u32,
-    /// current TID of this or newer row version
+    // TODO: t_field3
+    pub t_field3: u32,
+    /// current TID of this or newer tuple (or a
+	/// speculative insertion token)
     pub t_ctid: ItemPointerData,
     /// number of attributes, plus various flag bits
     pub t_infomask2: u16,
@@ -95,14 +114,39 @@ pub struct HeapTupleHeaderData {
     pub data: Vec<u8>,
 }
 
+///
+/// datum_typeid cannot be a domain over composite, only plain composite,
+/// even if the datum is meant as a value of a domain-over-composite type.
+/// This is in line with the general principle that CoerceToDomain does not
+/// change the physical representation of the base type value.
+///
+/// Note: field ordering is chosen with thought that Oid might someday
+/// widen to 64 bits.
+///
+pub struct DatumTupleFields {
+    /// varlena header (do not touch directly!)
+    pub datum_len_: u32,
+    /// -1, or identifier of a record type
+    pub datum_typmod: u32,
+    /// composite type OID, or RECORDOID
+    pub datum_typeid: u32,
+}
+
+pub enum TField3 {
+    /// current TID of this or newer row version
+    /// inserting or deleting command ID, or both
+    CommandId(u32),
+    /// XID for VACUUM operation moving a row version
+    /// old-style VACUUM FULL xact ID
+    Xvac(u32),
+}
+
 impl ByteEncoded for HeapTupleHeaderData {
     fn encode(&self) -> Vec<u8> {
         let mut buf = Vec::new();
         buf.extend(self.t_xmin.encode());
         buf.extend(self.t_xmax.encode());
-        buf.extend(self.t_cid.encode());
-        buf.extend(self.t_xvac.encode());
-        buf.extend(self.t_ctid.encode());
+        buf.extend(self.t_field3.encode());
         buf.extend(self.t_infomask2.encode());
         buf.extend(self.t_infomask.encode());
         buf.extend(self.t_hoff.encode());
@@ -113,18 +157,16 @@ impl ByteEncoded for HeapTupleHeaderData {
     fn decode(bytes: &[u8]) -> ByteEncodeResult<Self> {
         let t_xmin = u32::decode(bytes.get_byte_slice(0, 4)?)?;
         let t_xmax = u32::decode(bytes.get_byte_slice(4, 8)?)?;
-        let t_cid = u32::decode(bytes.get_byte_slice(8, 12)?)?;
-        let t_xvac = u32::decode(bytes.get_byte_slice(12, 16)?)?;
-        let t_ctid = ItemPointerData::decode(bytes.get_byte_slice(16, 22)?)?;
-        let t_infomask2 = u16::decode(bytes.get_byte_slice(22, 24)?)?;
-        let t_infomask = u16::decode(bytes.get_byte_slice(24, 26)?)?;
-        let t_hoff = u8::decode(bytes.get_byte_slice(26, 27)?)?;
-        let data = bytes[27..].to_vec();
+        let t_field3 = u32::decode(bytes.get_byte_slice(8, 12)?)?;
+        let t_ctid = ItemPointerData::decode(bytes.get_byte_slice(12, 18)?)?;
+        let t_infomask2 = u16::decode(bytes.get_byte_slice(18, 20)?)?;
+        let t_infomask = u16::decode(bytes.get_byte_slice(20, 22)?)?;
+        let t_hoff = u8::decode(bytes.get_byte_slice(22, 23)?)?;
+        let data = bytes.get(23..).ok_or(ByteEncodeError::NotEnoughBytes { expected: 23, actual: bytes.len() })?.to_vec();
         Ok(HeapTupleHeaderData {
             t_xmin,
             t_xmax,
-            t_cid,
-            t_xvac,
+            t_field3,
             t_ctid,
             t_infomask2,
             t_infomask,
@@ -136,9 +178,7 @@ impl ByteEncoded for HeapTupleHeaderData {
     fn encode_into_writer(&self, writer: &mut impl std::io::Write) -> ByteEncodeResult<()> {
         self.t_xmin.encode_into_writer(writer)?;
         self.t_xmax.encode_into_writer(writer)?;
-        self.t_cid.encode_into_writer(writer)?;
-        self.t_xvac.encode_into_writer(writer)?;
-        self.t_ctid.encode_into_writer(writer)?;
+        self.t_field3.encode_into_writer(writer)?;
         self.t_infomask2.encode_into_writer(writer)?;
         self.t_infomask.encode_into_writer(writer)?;
         self.t_hoff.encode_into_writer(writer)?;
@@ -148,8 +188,7 @@ impl ByteEncoded for HeapTupleHeaderData {
     fn decode_from_reader(reader: &mut impl std::io::Read) -> ByteEncodeResult<Self> {
         let t_xmin = u32::decode_from_reader(reader)?;
         let t_xmax = u32::decode_from_reader(reader)?;
-        let t_cid = u32::decode_from_reader(reader)?;
-        let t_xvac = u32::decode_from_reader(reader)?;
+        let t_field3 = u32::decode_from_reader(reader)?;
         let t_ctid = ItemPointerData::decode_from_reader(reader)?;
         let t_infomask2 = u16::decode_from_reader(reader)?;
         let t_infomask = u16::decode_from_reader(reader)?;
@@ -159,8 +198,7 @@ impl ByteEncoded for HeapTupleHeaderData {
         Ok(HeapTupleHeaderData {
             t_xmin,
             t_xmax,
-            t_cid,
-            t_xvac,
+            t_field3,
             t_ctid,
             t_infomask2,
             t_infomask,

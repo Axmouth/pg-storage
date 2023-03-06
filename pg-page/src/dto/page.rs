@@ -25,8 +25,12 @@ impl Page {
         let item_id_data_bytes =
             bytes.get_byte_slice(0, header_data.pd_lower as usize - header_size)?;
         let item_id_data: Vec<ItemIdData> = Vec::decode(item_id_data_bytes)?;
-        let mut items = Vec::new();
+        let mut items = Vec::with_capacity(item_id_data.len());
         for item_id in &item_id_data {
+            if !item_id.is_normal() {
+                continue;
+            }
+
             let item_bytes = bytes.get_byte_slice(
                 item_id.lp_off() as usize - header_size,
                 item_id.lp_off() as usize - header_size + item_id.lp_len() as usize,
